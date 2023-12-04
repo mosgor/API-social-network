@@ -16,6 +16,7 @@ class User:
         self.email = email
         self.total_reactions = total_reactions
         self.posts = posts
+        self.status = "created"
 
     @staticmethod
     def is_valid_email(email):
@@ -30,7 +31,11 @@ class User:
 
     @staticmethod
     def is_valid_id(user_id):
-        return isinstance(user_id, int) and 0 <= user_id < len(USERS)
+        return (
+            isinstance(user_id, int)
+            and 0 <= user_id < len(USERS)
+            and USERS[user_id].status != "deleted"
+        )
 
     def add_post(self, post):
         self.posts.append(post)
@@ -39,7 +44,9 @@ class User:
         self.total_reactions += 1
 
     def repr(self):
-        return f"{self.id} {self.first_name} {self.last_name}"
+        if self.status == "created":
+            return f"{self.id} {self.first_name} {self.last_name}"
+        return "DELETED USER"
 
     def get_posts(self):
         return self.posts
@@ -71,17 +78,24 @@ class Post:
         self.author_id = author_id
         self.text = text
         self.reactions = reactions
+        self.status = "created"
 
     @staticmethod
     def is_valid_id(post_id):
-        return isinstance(post_id, int) and 0 <= post_id < len(POSTS)
+        return (
+            isinstance(post_id, int)
+            and 0 <= post_id < len(POSTS)
+            and POSTS[post_id].status != "deleted"
+        )
 
     def add_reaction(self, reaction):
         self.reactions.append(reaction)
         USERS[self.author_id].increase_reactions()
 
     def repr(self):
-        return f"Own id: {self.id} author id: {self.author_id} {self.text}"
+        if self.status == "created":
+            return f"Own id: {self.id} author id: {self.author_id} {self.text}"
+        return "DELETED POST"
 
     def get_reactions_count(self):
         return len(self.reactions)

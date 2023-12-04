@@ -10,9 +10,9 @@ ENDPOINT = "http://127.0.0.1:5000"
 
 def payload_model():
     return {
-        "first_name": "Name" + str(uuid4()),
-        "last_name": "Surname" + str(uuid4()),
-        "email": "some_email" + str(uuid4()) + "@mail.ru",
+        "first_name": str(uuid4()),
+        "last_name": str(uuid4()),
+        "email": str(uuid4()) + "@mail.ru",
     }
 
 
@@ -32,6 +32,14 @@ def test_user_create():
         and get_response.json()["last_name"] == payload["last_name"]
         and get_response.json()["email"] == payload["email"]
     )
+    delete_response = requests.delete(f"{ENDPOINT}/users/{user_id}")
+    assert (
+        delete_response.status_code == HTTPStatus.OK
+        and delete_response.json()["first_name"] == payload["first_name"]
+        and delete_response.json()["last_name"] == payload["last_name"]
+        and delete_response.json()["email"] == payload["email"]
+        and delete_response.json()["status"] == "deleted"
+    )
 
 
 def test_user_create_wrong_data():
@@ -42,42 +50,78 @@ def test_user_create_wrong_data():
 
 
 def test_user_posts():
-    payload = payload_model()
-    create_user_response = requests.post(f"{ENDPOINT}/users/create", json=payload)
-    assert create_user_response.status_code == HTTPStatus.CREATED
-    first_user_id = create_user_response.json()["id"]
-    post = {"author_id": first_user_id, "text": "Test"}
-    create_post_response = requests.post(f"{ENDPOINT}/posts/create", json=post)
-    first_post_id = create_post_response.json()["id"]
-    requests.post(f"{ENDPOINT}/posts/create", json=post)
-    payload = payload_model()
-    create_user_response = requests.post(f"{ENDPOINT}/users/create", json=payload)
-    assert create_user_response.status_code == HTTPStatus.CREATED
-    second_user_id = create_user_response.json()["id"]
-    react = {"user_id": second_user_id, "reaction": "Test"}
+    test_users = []
+    for _ in range(2):
+        payload = payload_model()
+        create_user_response = requests.post(f"{ENDPOINT}/users/create", json=payload)
+        assert create_user_response.status_code == HTTPStatus.CREATED
+        test_users.append(create_user_response.json()["id"])
+    test_posts = []
+    post = {"author_id": test_users[0], "text": "Test"}
+    for _ in range(2):
+        create_post_response = requests.post(f"{ENDPOINT}/posts/create", json=post)
+        test_posts.append(create_post_response.json()["id"])
+    react = {"user_id": test_users[1], "reaction": "Test"}
     react_post_response = requests.post(
-        f"{ENDPOINT}/posts/{first_post_id}/reaction", json=react
+        f"{ENDPOINT}/posts/{test_posts[0]}/reaction", json=react
     )
     assert react_post_response.status_code == HTTPStatus.OK
-    get_response = requests.get(
-        f"{ENDPOINT}/users/{first_user_id}/posts", json={"sort": "asc"}
-    )
-    sorted_posts = get_response.json()["posts"]
-    assert (
-        isinstance(sorted_posts, list)
-        and all(
-            sorted_posts[x]["reactions"] <= sorted_posts[x + 1]["reactions"]
-            for x in range(len(sorted_posts) - 1)
+    for mode in ["asc", "desc"]:
+        get_response = requests.get(
+            f"{ENDPOINT}/users/{test_users[0]}/posts", json={"sort": mode}
         )
-    )
-    get_response = requests.get(
-        f"{ENDPOINT}/users/{first_user_id}/posts", json={"sort": "desc"}
-    )
-    sorted_posts = get_response.json()["posts"]
-    assert (
-        isinstance(sorted_posts, list)
-        and all(
-            sorted_posts[x]["reactions"] >= sorted_posts[x + 1]["reactions"]
-            for x in range(len(sorted_posts) - 1)
-        )
-    )
+        sorted_posts = get_response.json()["posts"]
+        if mode == "asc":
+            assert isinstance(sorted_posts, list) and all(
+                sorted_posts[x]["reactions"] <= sorted_posts[x + 1]["reactions"]
+                for x in range(len(sorted_posts) - 1)
+            )
+        else:
+            assert isinstance(sorted_posts, list) and all(
+                sorted_posts[x]["reactions"] >= sorted_posts[x + 1]["reactions"]
+                for x in range(len(sorted_posts) - 1)
+            )
+    for i in range(2):
+        delete_user_response = requests.delete(f"{ENDPOINT}/users/{test_users[i]}")
+        assert delete_user_response.status_code == HTTPStatus.OK
+        delete_post_response = requests.delete(f"{ENDPOINT}/posts/{test_posts[i]}")
+        assert delete_post_response.status_code == HTTPStatus.OK
+
+
+def test_leaderboard():
+    n = 3
+    test_users = []
+    for _ in range(n):
+        payload = payload_model()
+        create_response = requests.post(f"{ENDPOINT}/users/create", json=payload)
+        assert create_response.status_code == HTTPStatus.CREATED
+        test_users.append(create_response.json()["id"])
+    payload = {"type": "list", "sort": ""}
+    for mode in ["asc", "desc"]:
+        payload["sort"] = mode
+        get_response = requests.get(f"{ENDPOINT}/users/leaderboard", json=payload)
+        leaderboard = get_response.json()["users"]
+        if mode == "asc":
+            assert (
+                isinstance(leaderboard, list)
+                and all(
+                    leaderboard[x]["total_reactions"]
+                    <= leaderboard[x + 1]["total_reactions"]
+                    for x in range(len(leaderboard) - 1)
+                )
+                and len(leaderboard) == n
+            )
+        else:
+            assert (
+                isinstance(leaderboard, list)
+                and all(
+                    leaderboard[x]["total_reactions"]
+                    >= leaderboard[x + 1]["total_reactions"]
+                    for x in range(len(leaderboard) - 1)
+                )
+                and len(leaderboard) == n
+            )
+    payload = {"type": "graph"}
+    get_response = requests.get(f"{ENDPOINT}/users/leaderboard", json=payload)
+    leaderboard = get_response.text
+    assert leaderboard == '<img src = "/static/leaderboard.png">'

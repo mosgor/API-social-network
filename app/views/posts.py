@@ -63,3 +63,25 @@ def react(post_id):
         )
     POSTS[post_id].add_reaction(reaction)
     return Response(status=HTTPStatus.OK)
+
+
+@app.delete("/posts/<int:post_id>")
+def delete_post(post_id):
+    if not models.Post.is_valid_id(post_id):
+        return Response(status=HTTPStatus.NOT_FOUND)
+    POSTS[post_id].status = "deleted"
+    post = POSTS[post_id]
+    response = Response(
+        json.dumps(
+            {
+                "id": post.id,
+                "author_id": post.author_id,
+                "text": post.text,
+                "reactions": post.reactions,
+                "status": "deleted",
+            }
+        ),
+        HTTPStatus.OK,
+        mimetype="application/json",
+    )
+    return response

@@ -89,9 +89,15 @@ def get_leaderboard():
     if leaderboard_type == "list":
         type_of_sort = data["sort"]
         if type_of_sort == "asc":
-            leaderboard = [user.to_dict() for user in sorted(USERS)]
+            leaderboard = [
+                user.to_dict() for user in sorted(USERS) if user.status != "deleted"
+            ]
         elif type_of_sort == "desc":
-            leaderboard = [user.to_dict() for user in sorted(USERS, reverse=True)]
+            leaderboard = [
+                user.to_dict()
+                for user in sorted(USERS, reverse=True)
+                if user.status != "deleted"
+            ]
         else:
             return Response("Wrong type of sorting", status=HTTPStatus.BAD_REQUEST)
         return Response(
@@ -101,8 +107,8 @@ def get_leaderboard():
         )
     elif leaderboard_type == "graph":
         fig, ax = plt.subplots()
-        user_names = [user.get_name() for user in USERS]
-        user_reactions = [user.get_total_reactions() for user in USERS]
+        user_names = [user.get_name() for user in USERS if user.status != "deleted"]
+        user_reactions = [user.get_total_reactions() for user in USERS if user.status != "deleted"]
         ax.bar(user_names, user_reactions)
         ax.set_ylabel("User reactions")
         ax.set_title("User leaderboard by reactions")
@@ -114,3 +120,27 @@ def get_leaderboard():
         )
     else:
         return Response("Wrong type of leaderboard", status=HTTPStatus.BAD_REQUEST)
+
+
+@app.delete("/users/<int:user_id>")
+def delete_user(user_id):
+    if not models.User.is_valid_id(user_id):
+        return Response(status=HTTPStatus.NOT_FOUND)
+    USERS[user_id].status = "deleted"
+    user = USERS[user_id]
+    response = Response(
+        json.dumps(
+            {
+                "id": user.id,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "total_reactions": user.total_reactions,
+                "posts": user.posts,
+                "status": "deleted",
+            }
+        ),
+        HTTPStatus.OK,
+        mimetype="application/json",
+    )
+    return response
