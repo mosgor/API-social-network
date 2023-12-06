@@ -61,7 +61,8 @@ def sort_posts(user_id):
     sort_type = data["sort"]
     unsorted_posts = {}
     for post_num in USERS[user_id].get_posts():
-        unsorted_posts[post_num] = POSTS[post_num].get_reactions_count()
+        if POSTS[post_num].status != "deleted":
+            unsorted_posts[post_num] = POSTS[post_num].get_reactions_count()
     if sort_type == "asc":
         sorted_values = sorted(unsorted_posts.values())
     elif sort_type == "desc":
@@ -108,7 +109,9 @@ def get_leaderboard():
     elif leaderboard_type == "graph":
         fig, ax = plt.subplots()
         user_names = [user.get_name() for user in USERS if user.status != "deleted"]
-        user_reactions = [user.get_total_reactions() for user in USERS if user.status != "deleted"]
+        user_reactions = [
+            user.get_total_reactions() for user in USERS if user.status != "deleted"
+        ]
         ax.bar(user_names, user_reactions)
         ax.set_ylabel("User reactions")
         ax.set_title("User leaderboard by reactions")
@@ -126,8 +129,8 @@ def get_leaderboard():
 def delete_user(user_id):
     if not models.User.is_valid_id(user_id):
         return Response(status=HTTPStatus.NOT_FOUND)
-    USERS[user_id].status = "deleted"
     user = USERS[user_id]
+    user.status = "deleted"
     response = Response(
         json.dumps(
             {
@@ -137,7 +140,7 @@ def delete_user(user_id):
                 "email": user.email,
                 "total_reactions": user.total_reactions,
                 "posts": user.posts,
-                "status": "deleted",
+                "status": user.status,
             }
         ),
         HTTPStatus.OK,

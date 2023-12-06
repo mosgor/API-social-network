@@ -1,7 +1,5 @@
-from app import app, USERS, POSTS, models
-from flask import request, Response, url_for
+import os.path
 from http import HTTPStatus
-import matplotlib.pyplot as plt
 import requests
 from uuid import uuid4
 
@@ -124,4 +122,10 @@ def test_leaderboard():
     payload = {"type": "graph"}
     get_response = requests.get(f"{ENDPOINT}/users/leaderboard", json=payload)
     leaderboard = get_response.text
-    assert leaderboard == '<img src = "/static/leaderboard.png">'
+    assert leaderboard == '<img src = "/static/leaderboard.png">' and os.path.exists(
+        "app/static/leaderboard.png"
+    )
+    os.remove("app/static/leaderboard.png")
+    for i in range(n):
+        delete_response = requests.delete(f"{ENDPOINT}/users/{test_users[i]}")
+        assert delete_response.status_code == HTTPStatus.OK

@@ -69,8 +69,8 @@ def react(post_id):
 def delete_post(post_id):
     if not models.Post.is_valid_id(post_id):
         return Response(status=HTTPStatus.NOT_FOUND)
-    POSTS[post_id].status = "deleted"
     post = POSTS[post_id]
+    post.status = "deleted"
     response = Response(
         json.dumps(
             {
@@ -78,7 +78,7 @@ def delete_post(post_id):
                 "author_id": post.author_id,
                 "text": post.text,
                 "reactions": post.reactions,
-                "status": "deleted",
+                "status": post.status,
             }
         ),
         HTTPStatus.OK,
